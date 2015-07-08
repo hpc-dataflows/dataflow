@@ -30,6 +30,13 @@ def savetxt(x):
     outfile=open(outfilename,'w')
     outfile.write(str(x[0])+" "+str(x[1])+" "+str(x[2])+"\n")
 
+def savebin(x):
+    basedir='/tmp'  #'/mnt'
+    idx=len(glob(basedir+'/reduce_output-*.bin'))
+    outfilename=basedir+"/reduce_output-"+str(idx).zfill(2)+".bin"
+    outfile=open(outfilename,'w')
+    outfile.write(str(x.data))
+
 if __name__ == "__main__":
 
     if len(sys.argv) != 2:
@@ -46,5 +53,6 @@ if __name__ == "__main__":
     avg = A.reduce(avg_vec3)
 
     savebin(avg)
+    savetxt(avg)
 
     sc.stop()
