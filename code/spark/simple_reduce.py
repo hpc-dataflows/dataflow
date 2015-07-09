@@ -15,12 +15,13 @@ from glob import glob
 
 def parseVector(line):
     arr= np.fromstring(line,dtype=np.float64)
-    return arr
+    return (arr,1)   #average and setsize
 
 def avg_vec3(a,b):
-    a[0] = (a[0]+b[0])/2.0
-    a[1] = (a[1]+b[1])/2.0
-    a[2] = (a[2]+b[2])/2.0
+    a[0][0] = (a[1]*a[0][0]+b[1]*b[0][0])/(a[1]+b[1])
+    a[0][1] = (a[1]*a[0][1]+b[1]*b[0][1])/(a[1]+b[1])
+    a[0][2] = (a[1]*a[0][2]+b[1]*b[0][2])/(a[1]+b[1])
+    a=(a[0],a[1]+b[1])
     return a
 
 def savetxt(x):
@@ -28,14 +29,14 @@ def savetxt(x):
     idx=len(glob(basedir+'/reduce_output-*.txt'))
     outfilename=basedir+"/reduce_output-"+str(idx).zfill(2)+".txt"
     outfile=open(outfilename,'w')
-    outfile.write(str(x[0])+" "+str(x[1])+" "+str(x[2])+"\n")
+    outfile.write(str(x[0][0])+" "+str(x[0][1])+" "+str(x[0][2])+"\n")
 
 def savebin(x):
     basedir='/tmp'  #'/mnt'
     idx=len(glob(basedir+'/reduce_output-*.bin'))
     outfilename=basedir+"/reduce_output-"+str(idx).zfill(2)+".bin"
     outfile=open(outfilename,'w')
-    outfile.write(str(x.data))
+    outfile.write(str(x[0].data))
 
 if __name__ == "__main__":
 
