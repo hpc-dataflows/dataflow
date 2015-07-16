@@ -23,7 +23,7 @@ def readTiff(name):
 def threshold(x,sigma):
     """crop and smooth image, then calculate multithreshold"""
     import skimage.filters,skimage.util
-    cropped=skimage.util.crop(x[1],(50,100,50,100))
+    cropped=skimage.util.crop(x[1],((50,100),(50,100)))
     img=skimage.filters.gaussian_filter(x[1],sigma)
     # since we don't have Matlab's multithresh, and furthermore since that's really just a hack...
     # 1) reduce image range to mean +- stddev
@@ -31,14 +31,14 @@ def threshold(x,sigma):
     # afterwards we'll average the thresholds
     # This is also just a hack, based on experimentation using ImageJ.
     # (It's possible we want to average all these images prior to utilizing this method.)
-    sdv=smoothed.std(); mean=smoothed.mean()
-    img=smoothed[smoothed<(mean+sdv)]
+    sdv=img.std(); mean=img.mean()
+    img=img[img<(mean+sdv)]
     img=img[img>(mean-sdv)]
     thresh=skimage.filters.threshold_otsu(img)
     return (x[0],thresh,1)
 
 def threshold_func(sigma):
-    return lambda x: crop_and_smooth(x,sigma)
+    return lambda x: threshold(x,sigma)
         
 def smooth_and_apply_threshold(x,sigma,thresh):
     """smooth and apply the given threshold"""
@@ -48,23 +48,38 @@ def smooth_and_apply_threshold(x,sigma,thresh):
     img[img>thresh]=0.85
     return (x[0],img,1)
 
-def threshold_func(sigma):
-    return lambda x: crop_and_smooth(x,sigma)
+def smooth_and_apply_threshold_func(sigma,thresh):
+    return lambda x: smooth_and_apply_threshold(x,sigma,thresh)
         
 def avg(a,b):
     newidx=a[0]; newidx.extend(b[0])
-    avgimg=(a[1]*a[2]+b[1]*b[2])/(a[2]+b[2]) #running average
+    result=(a[1]*a[2]+b[1]*b[2])/(a[2]+b[2]) #running average
     newden=a[2]+b[2]
-    return (newidx,avgimg,newden)
+    return (newidx,result,newden)
 
 def savebin(x):
     from PIL import Image 
-    basedir='/tmp'  #'/mnt'
-    idx=len(glob(basedir+'/avg_output-*.tif'))
-    outfilename=basedir+"/avg_output-"+str(idx).zfill(2)+".tif"
+    from glob import glob
+    basedir='/mnt/share/output' #'/tmp'  #'/mnt'
+    #    idx=len(glob(basedir+'/avg_output-*.tif'))   #race conditions when using /mnt/share (nfs share), reasonable to expect for any non-serial execition
+    idx=x[0][0]
+    outfilename=basedir+"/avg_output-"+str(idx).zfill(3)+".tif"
     print("saving %s..."%outfilename)
     result=Image.fromarray(x[1])
     result.save(outfilename)
+
+def savetxt(x):
+    from glob import glob
+    basedir='/mnt/share/output' # '/tmp'  #'/mnt'
+    #idx=len(glob(basedir+'/thresh-*.txt'))  #race conditions when using /mnt/share (nfs share), reasonable to expect for any non-serial execition
+    idx=x[0][0]
+    outfilename=basedir+"/thresh-"+str(idx).zfill(3)+".txt"
+    print("saving %s..."%outfilename)
+    outfile=open(outfilename,'w')
+    outfile.write(str(x[0])+": "+str(x[1])+"\n")
+
+def noop(x):
+    print("noop")
 
 if __name__ == "__main__":
 
@@ -89,13 +104,16 @@ if __name__ == "__main__":
     # calculate threshold using partial stack
     tmin_idx=int(threshold_percent*stack.count())
     tmax_idx=stack.count()-tmin_idx
-    threshold_stack=stack.filter(lambda x: x[0]>=tmin_idx and x[1]<=tmax_idx)
+    threshold_stack=stack.filter(lambda x: x[0][0]>=tmin_idx and x[0][0]<=tmax_idx)
+    print("partial stack size is %d"%threshold_stack.count())
+    #threshold_stack.foreach(noop)  #useful to force pipeline to execute for debugging
     thresholds=threshold_stack.map(threshold_func(gaussian_sigma))
+    thresholds.foreach(savetxt)
     thresh=thresholds.reduce(avg)
-    print("threshold is %f"%thresh)
+    print("threshold is %f"%thresh[1])
     
     # apply threshold to entire stack
-    stack=stack.map(apply_threshold_func(thresh))
+    stack=stack.map(smooth_and_apply_threshold_func(gaussian_sigma,thresh[1]))
     stack.foreach(savebin)
     
     sc.stop()
