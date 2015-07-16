@@ -7,28 +7,22 @@ Requires http://scikit-image.org/.
 
 from __future__ import print_function
 from __future__ import division
-import sys
-import numpy as np
-import skimage.io,skimage.data,skimage.filters,skimage.util
 from pyspark import SparkContext
-#from libtiff import TIFF
-from glob import glob
-import re
-#from sys import stdout
-from PIL import Image 
 
 def readTiff(name):
     """returns a tuple of the slice index and loaded tiff"""
+    import skimage.io
+    from glob import glob
+    import re
     num=int(re.match(".*image(...).tif",name).group(1))  #yeah, yeah...
     print("Reading %s, num = %d..."%(name,num))
-    #tif=TIFF.open(name)     # read image info using libtiff (don't worry, this only loads the metadata, very fast)
-    #print(tif.info())
     img=skimage.io.imread(name)/65535 # read image data using skimage.io (because libtiff.read_image doesn't work!)
     print("image range: "+str(img.min())+" to "+str(img.max()))
     return ([num],img,1)  # (slice, data, running_average_count)
 
 def threshold(x,sigma):
     """crop and smooth image, then calculate multithreshold"""
+    import skimage.filters,skimage.util
     cropped=skimage.util.crop(x[1],(50,100,50,100))
     img=skimage.filters.gaussian_filter(x[1],sigma)
     # since we don't have Matlab's multithresh, and furthermore since that's really just a hack...
@@ -48,6 +42,7 @@ def threshold_func(sigma):
         
 def smooth_and_apply_threshold(x,sigma,thresh):
     """smooth and apply the given threshold"""
+    import skimage.filters
     img=skimage.filters.gaussian_filter(x[1],sigma)
     img[img<thresh]=0.15
     img[img>thresh]=0.85
@@ -63,6 +58,7 @@ def avg(a,b):
     return (newidx,avgimg,newden)
 
 def savebin(x):
+    from PIL import Image 
     basedir='/tmp'  #'/mnt'
     idx=len(glob(basedir+'/avg_output-*.tif'))
     outfilename=basedir+"/avg_output-"+str(idx).zfill(2)+".tif"
@@ -72,6 +68,7 @@ def savebin(x):
 
 if __name__ == "__main__":
 
+    import sys
     if len(sys.argv) < 2:
         print("Usage: threshold <tiff_dir> <threshold_percent> <gaussian_sigma>", file=sys.stderr)
         exit(-1)
