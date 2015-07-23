@@ -37,9 +37,6 @@ def threshold(x,sigma):
     thresh=skimage.filter.threshold_otsu(img)
     return (x[0],thresh,1)
 
-def threshold_func(sigma):
-    return lambda x: threshold(x,sigma)
-        
 def smooth_and_apply_threshold(x,sigma,thresh):
     """smooth and apply the given threshold"""
     import skimage.filter
@@ -48,9 +45,6 @@ def smooth_and_apply_threshold(x,sigma,thresh):
     img[img>thresh]=0.85
     return (x[0],img,1)
 
-def smooth_and_apply_threshold_func(sigma,thresh):
-    return lambda x: smooth_and_apply_threshold(x,sigma,thresh)
-        
 def avg(a,b):
     newidx=a[0]; newidx.extend(b[0])
     result=(a[1]*a[2]+b[1]*b[2])/(a[2]+b[2]) #running average
@@ -66,9 +60,6 @@ def savebin(x,dst):
     print("saving %s..."%outfilename)
     result=Image.fromarray(x[1])
     result.save(outfilename)
-
-def savebin_func(dst):
-    return lambda x: savebin(x,dst)
 
 def savetxt(x):
     from glob import glob
@@ -112,13 +103,13 @@ if __name__ == "__main__":
     threshold_stack=stack.filter(lambda x: x[0][0]>=tmin_idx and x[0][0]<=tmax_idx)
     #print("partial stack size is %d"%threshold_stack.count())   #remember, .count() is expensive, so don't use it unnecessarily
     #threshold_stack.foreach(noop)  #useful to force pipeline to execute for debugging
-    thresholds=threshold_stack.map(threshold_func(gaussian_sigma))
+    thresholds=threshold_stack.map(lambda x: threshold(x,gaussian_sigma))
     #thresholds.foreach(savetxt)
     thresh=thresholds.reduce(avg)
     print("threshold is %f"%thresh[1])
     
     # apply threshold to entire stack
-    stack=stack.map(smooth_and_apply_threshold_func(gaussian_sigma,thresh[1]))
+    stack=stack.map(lambda x: smooth_and_apply_threshold(x,gaussian_sigma,thresh[1]))
 
     # save output slices
     outdir=args.dst+"/output-pct"+str(threshold_percent)+"-sigma"+str(gaussian_sigma)+"__thresh"+str(thresh[1])
@@ -129,6 +120,6 @@ if __name__ == "__main__":
     except Exception as e:
         print("exception: "+str(e))
         pass
-    stack.foreach(savebin_func(outdir))
+    stack.foreach(lambda x: savebin(x,outdir))
     
     sc.stop()

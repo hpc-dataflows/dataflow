@@ -19,17 +19,12 @@ def parseVectors(bin):
 
 def add_vec3(arr,vec):
     for i in xrange(len(arr[1])):
-        arr[1][i][0] += vec[0]
-        arr[1][i][1] += vec[1]
-        arr[1][i][2] += vec[2]
+        arr[1][i] += vec
     return arr
 
-def construct_apply_shift(shift):
-    return lambda p: add_vec3(p,shift)
-        
 def savebin(arr):
     import re
-    basedir='/projects/visualization/cam/output'
+    basedir='/projects/visualization/cam/output/simple_map'
     idx=re.match(".*(.-..?)\.bin",arr[0]).group(1) # terribly specific
     outfilename=basedir+"/binary_output-"+str(idx)+".bin"
     outfile=open(outfilename,'w')
@@ -44,12 +39,17 @@ if __name__ == "__main__":
     sc = SparkContext(appName="SimpleMap")
 
     rdd = sc.binaryFiles(sys.argv[1])
-    A = rdd.map(parseVectors)     #.cache() (just cached to see size of one block)
+    A = rdd.map(parseVectors) #.cache() #(just cached to see size of one block)
     print("numPartitions(%d,%s): %d"%(A.id(),A.name(),A.getNumPartitions()))
 
     shift=np.array([25.25,-12.125,6.333],dtype=np.float64)
-    B = A.map(construct_apply_shift(shift))
+    B = A.map(lambda x: add_vec3(x,shift))
     print("numPartitions(%d,%s): %d"%(B.id(),B.name(),B.getNumPartitions()))
+    #(todo, like aps_thresholder) B.foreach(lambda x: savebin(x,outdir))
     B.foreach(savebin)
+
+    # import time
+    # while True:
+    #     time.sleep(5)
 
     sc.stop()
