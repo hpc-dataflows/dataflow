@@ -44,7 +44,7 @@ if __name__ == "__main__":
     sc = SparkContext(appName="SimpleMap")
 
     rdd = sc.binaryFiles(sys.argv[1])
-    A = rdd.map(parseVectors)
+    A = rdd.map(parseVectors)     #.cache() (just cached to see size of one block)
     print("numPartitions(%d,%s): %d"%(A.id(),A.name(),A.getNumPartitions()))
 
     shift=np.array([25.25,-12.125,6.333],dtype=np.float64)
