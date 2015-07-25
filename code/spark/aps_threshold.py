@@ -20,6 +20,23 @@ def readTiff(name):
     print("image range: "+str(img.min())+" to "+str(img.max()))
     return ([num],img,1)  # (slice, data, running_average_count)
 
+def crop(x):
+    import skimage.util
+    return (x[0],x[1][50:100,50:-100],1)
+
+def smooth(x,sigma):
+    import skimage.filter
+    return (x[0],skimage.filter.gaussian_filter(x[1],sigma),1)
+
+def thresh(x):
+    import skimage.filter
+    img=x[1]
+    sdv=img.std(); mean=img.mean()
+    img=img[img<(mean+sdv)]
+    img=img[img>(mean-sdv)]
+    thresh=skimage.filter.threshold_otsu(img)
+    return (x[0],thresh,1)
+
 def threshold(x,sigma):
     """crop and smooth image, then calculate multithreshold"""
     import skimage.filter,skimage.util
@@ -41,6 +58,13 @@ def smooth_and_apply_threshold(x,sigma,thresh):
     """smooth and apply the given threshold"""
     import skimage.filter
     img=skimage.filter.gaussian_filter(x[1],sigma)
+    img[img<thresh]=0.15
+    img[img>thresh]=0.85
+    return (x[0],img,1)
+
+def apply_threshold(x,thresh):
+    """apply the given threshold"""
+    img=x[1]
     img[img<thresh]=0.15
     img[img>thresh]=0.85
     return (x[0],img,1)
@@ -78,7 +102,7 @@ def genfilelist(path,ext):
     import os, os.path, tempfile
     files = os.listdir(path)
     filelist =  [ os.path.join(path,f) for f in files if f.endswith(ext) ]
-    outfile = tempfile.NamedTemporaryFile(delete=False)
+    outfile = tempfile.NamedTemporaryFile(delete=False,prefix="/projects/visualization/cam/scratch")
     for f in filelist:
         outfile.write(f + '\n')
     outfile.close()
@@ -95,6 +119,8 @@ if __name__ == "__main__":
     parser.add_argument("-s","--sigma",type=float,default=5,help="sigma to use for gaussing smoothing")
     parser.add_argument("-d","--dst",default="/tmp",help="destination path")
     parser.add_argument("-n","--num_partitions",default=16,help="number of partitions to create, each with num_files/num_partitions records")
+    parser.add_argument('--nocache', dest='nocache',default=False,action='store_true',help="cache image stack before thresholding")
+    parser.add_argument('--granular', dest='granular',default=False,action='store_true',help="granular image processing operations (vs grouped)")
     args = parser.parse_args()
 
     threshold_percent=args.percent
@@ -104,20 +130,26 @@ if __name__ == "__main__":
 
     # import time
     # t0=time.clock()
+
     filelist=sc.emptyRDD()
     if args.path != None:
         filelist = genfilelist(args.path, args.ext)
-        filelist = sc.textFile(filelist,args.num_partitions)
+        filelist = sc.textFile(filelist)
     else:
-        filelist=sc.textFile(args.filelist,args.num_partitions)
+        filelist=sc.textFile(args.filelist)
+
+    # threshold_stack.foreach(noop)  #useful to force pipeline to execute for debugging
     # tmark=time.clock()
     # print("generate and read filelist: %0.6f"%(tmark-to))
     # t0=tmark
 
     slice_count=filelist.count()
-    #filelist.repartition(slice_count)  # I suspect file size plays a significant role in how many records per partition is optimal.
+    filelist.repartition(args.num_partitions)  # Or maybe just slice_count, but I suspect file size plays a significant role in how many records per partition is optimal.
 
-    stack=filelist.map(readTiff).cache()
+    stack=filelist.map(readTiff)
+    if not args.nocache:
+        stack.cache()
+
     #print("numPartitions(%d,%s): %d"%(stack.id(),stack.name(),stack.getNumPartitions()))
     #avg = stack.reduce(avg)
     #savebin(avg)
@@ -128,14 +160,23 @@ if __name__ == "__main__":
     tmax_idx=slice_count-tmin_idx
     threshold_stack=stack.filter(lambda x: x[0][0]>=tmin_idx and x[0][0]<=tmax_idx)
     #print("partial stack size is %d"%threshold_stack.count())   #remember, .count() is expensive, so don't use it unnecessarily
-    #threshold_stack.foreach(noop)  #useful to force pipeline to execute for debugging
-    thresholds=threshold_stack.map(lambda x: threshold(x,gaussian_sigma))
+
+    thresholds=sc.emptyRDD()
+    if args.granular:
+        thresholds=threshold_stack.map(crop).map(lambda x: smooth(x,gaussian_sigma)).map(thresh)
+    else:
+        thresholds=threshold_stack.map(lambda x: threshold(x,gaussian_sigma))
+
     #thresholds.foreach(savetxt)
     thresh=thresholds.reduce(avg)
     print("threshold is %f"%thresh[1])
     
     # apply threshold to entire stack
-    stack=stack.map(lambda x: smooth_and_apply_threshold(x,gaussian_sigma,thresh[1]))
+    thresholds=sc.emptyRDD()
+    if args.granular:
+        stack=stack.map(lambda x: smooth(x,gaussian_sigma)).map(lambda x: apply_threshold(x,thresh[1]))
+    else:
+        stack=stack.map(lambda x: smooth_and_apply_threshold(x,gaussian_sigma,thresh[1]))
 
     # save output slices
     outdir=args.dst+"/output-pct"+str(threshold_percent)+"-sigma"+str(gaussian_sigma)+"__thresh"+str(thresh[1])
