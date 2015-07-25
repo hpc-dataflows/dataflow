@@ -74,11 +74,23 @@ def savetxt(x):
 def noop(x):
     print("noop")
 
+def genfilelist(path,ext):
+    import os, os.path, tempfile
+    files = os.listdir(path)
+    filelist =  [ os.path.join(path,f) for f in files if f.endswith(ext) ]
+    outfile = tempfile.NamedTemporaryFile(delete=False)
+    for f in filelist:
+        outfile.write(f + '\n')
+    outfile.close()
+    return outfile.name
+
 if __name__ == "__main__":
 
     import argparse
     parser = argparse.ArgumentParser(description="APS Image Processing (for Nicola Ferier).")
     parser.add_argument("-l","--filelist",help="text file containing names of input files")
+    parser.add_argument("-z","--path",help="path containing files")
+    parser.add_argument("-x","--ext",default=".tif",help="file extension (usually tif)")
     parser.add_argument("-p","--percent",type=float,default=0.3,help="filelist containing names of input files")
     parser.add_argument("-s","--sigma",type=float,default=5,help="sigma to use for gaussing smoothing")
     parser.add_argument("-d","--dst",default="/tmp",help="destination path")
@@ -89,7 +101,12 @@ if __name__ == "__main__":
 
     sc = SparkContext(appName="APS_Thresholder")
 
-    filelist=sc.textFile(args.filelist,48)   # try to create at least one partition per core (alternatively, create one partition per node (48 vs 4)
+    if args.path != None:
+        filelist = genfilelist(args.path, args.ext)
+        filelist = sc.textFile(filelist, 48)
+    else:
+        filelist=sc.textFile(args.filelist,48)   # try to create at least one partition per core (alternatively, create one partition per node (48 vs 4)
+
     stack=filelist.map(readTiff).cache()
     #print("numPartitions(%d,%s): %d"%(stack.id(),stack.name(),stack.getNumPartitions()))
     slice_count=stack.count()   #note: this is expensive
