@@ -94,6 +94,7 @@ if __name__ == "__main__":
     parser.add_argument("-p","--percent",type=float,default=0.3,help="filelist containing names of input files")
     parser.add_argument("-s","--sigma",type=float,default=5,help="sigma to use for gaussing smoothing")
     parser.add_argument("-d","--dst",default="/tmp",help="destination path")
+    parser.add_argument("-n","--num_partitions",default=16,help="number of partitions to create, each with num_files/num_partitions records")
     args = parser.parse_args()
 
     threshold_percent=args.percent
@@ -101,15 +102,23 @@ if __name__ == "__main__":
 
     sc = SparkContext(appName="APS_Thresholder")
 
+    # import time
+    # t0=time.clock()
+    filelist=sc.emptyRDD()
     if args.path != None:
         filelist = genfilelist(args.path, args.ext)
-        filelist = sc.textFile(filelist, 48)
+        filelist = sc.textFile(filelist,args.num_partitions)
     else:
-        filelist=sc.textFile(args.filelist,48)   # try to create at least one partition per core (alternatively, create one partition per node (48 vs 4)
+        filelist=sc.textFile(args.filelist,args.num_partitions)
+    # tmark=time.clock()
+    # print("generate and read filelist: %0.6f"%(tmark-to))
+    # t0=tmark
+
+    slice_count=filelist.count()
+    #filelist.repartition(slice_count)  # I suspect file size plays a significant role in how many records per partition is optimal.
 
     stack=filelist.map(readTiff).cache()
     #print("numPartitions(%d,%s): %d"%(stack.id(),stack.name(),stack.getNumPartitions()))
-    slice_count=stack.count()   #note: this is expensive
     #avg = stack.reduce(avg)
     #savebin(avg)
 
