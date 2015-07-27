@@ -7,10 +7,8 @@ Requires NumPy (http://www.numpy.org/).
 """
 
 from __future__ import print_function
-import sys
 import numpy as np
 from pyspark import SparkContext
-from glob import glob
 
 def parseVectors(bin):
     arr= np.fromstring(bin[1],dtype=np.float64)
@@ -22,32 +20,45 @@ def add_vec3(arr,vec):
         arr[1][i] += vec
     return arr
 
-def savebin(arr):
+def savebin(arr,dst):
     import re
-    basedir='/projects/visualization/cam/output/simple_map'
     idx=re.match(".*(.-..?)\.bin",arr[0]).group(1) # terribly specific
-    outfilename=basedir+"/binary_output-"+str(idx)+".bin"
+    outfilename=dst+"/output-"+str(idx)+".bin"
     outfile=open(outfilename,'w')
     outfile.write(arr[1].data)
 
 if __name__ == "__main__":
 
-    if len(sys.argv) != 2:
-        print("Usage: simple_map <file>", file=sys.stderr)
-        exit(-1)
+    import argparse
+    parser = argparse.ArgumentParser(description="Simple Map Microbenchmark")
+    parser.add_argument("-s","--src",help="directory containing input files")
+    parser.add_argument("-d","--dst",help="directory to write output files")
+    args = parser.parse_args()
 
     sc = SparkContext(appName="SimpleMap")
 
-    rdd = sc.binaryFiles(sys.argv[1])
-    A = rdd.map(parseVectors) #.cache() #(just cached to see size of one block)
+    # read input files
+    rdd = sc.binaryFiles(args.sourcedir)
+    A = rdd.map(parseVectors) #.cache() # cached to see size of one block, not necessary for app
     print("numPartitions(%d,%s): %d"%(A.id(),A.name(),A.getNumPartitions()))
 
+    # apply simple operation (V'=V+V0)
     shift=np.array([25.25,-12.125,6.333],dtype=np.float64)
     B = A.map(lambda x: add_vec3(x,shift))
     print("numPartitions(%d,%s): %d"%(B.id(),B.name(),B.getNumPartitions()))
-    #(todo, like aps_thresholder) B.foreach(lambda x: savebin(x,outdir))
-    B.foreach(savebin)
 
+    # write results
+    outdir=args.dst+"/simple_map"
+    print("outdir is "+outdir)
+    from os import makedirs
+    try:
+        makedirs(outdir)
+    except Exception as e:
+        #print("exception: "+str(e))   #it's okay if directory already exists...
+        pass
+    B.foreach(lambda x: savebin(x,outdir))
+
+    # used with .cache() above to examine RDD memory usage
     # import time
     # while True:
     #     time.sleep(5)
