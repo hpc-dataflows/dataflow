@@ -22,6 +22,7 @@ def add_vec3(arr,vec):
 
 def savebin(arr,dst):
     import re
+    # expects input names of the form <name>X-##?.bin (ex: imageA-3.bin, imageK-97.bin)
     idx=re.match(".*(.-..?)\.bin",arr[0]).group(1) # terribly specific
     outfilename=dst+"/output-"+str(idx)+".bin"
     outfile=open(outfilename,'w')
