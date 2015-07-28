@@ -102,7 +102,7 @@ def genfilelist(path,ext):
     import os, os.path, tempfile
     files = os.listdir(path)
     filelist =  [ os.path.join(path,f) for f in files if f.endswith(ext) ]
-    outfile = tempfile.NamedTemporaryFile(delete=False,prefix="/projects/visualization/cam/scratch")
+    outfile = tempfile.NamedTemporaryFile(delete=False,prefix="/projects/visualization/cam/scratch/")
     for f in filelist:
         outfile.write(f + '\n')
     outfile.close()
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     parser.add_argument("-p","--percent",type=float,default=0.3,help="filelist containing names of input files")
     parser.add_argument("-s","--sigma",type=float,default=5,help="sigma to use for gaussing smoothing")
     parser.add_argument("-d","--dst",default="/tmp",help="destination path")
-    parser.add_argument("-n","--num_partitions",default=16,help="number of partitions to create, each with num_files/num_partitions records")
+    parser.add_argument("-n","--num_partitions",type=int,default=16,help="number of partitions to create, each with num_files/num_partitions records")
     parser.add_argument('--nocache', dest='nocache',default=False,action='store_true',help="cache image stack before thresholding")
     parser.add_argument('--granular', dest='granular',default=False,action='store_true',help="granular image processing operations (vs grouped)")
     args = parser.parse_args()
@@ -128,25 +128,25 @@ if __name__ == "__main__":
 
     sc = SparkContext(appName="APS_Thresholder")
 
-    # import time
-    # t0=time.clock()
+    import time
+    t0=tbegin=time.time()
 
-    filelist=sc.emptyRDD()
+    files=sc.emptyRDD()
     if args.path != None:
-        filelist = genfilelist(args.path, args.ext)
-        filelist = sc.textFile(filelist)
+        filelist = genfilelist(args.path, args.ext)     #note: occasional problem here when worker tries to read unsynced nfs file, use filelist instead
+        files = sc.textFile(filelist)
     else:
-        filelist=sc.textFile(args.filelist)
+        files=sc.textFile(args.filelist)
 
     # threshold_stack.foreach(noop)  #useful to force pipeline to execute for debugging
-    # tmark=time.clock()
-    # print("generate and read filelist: %0.6f"%(tmark-to))
+    # tmark=time.time()
+    # print("generate and read files: %0.6f"%(tmark-to))
     # t0=tmark
 
-    slice_count=filelist.count()
-    filelist.repartition(args.num_partitions)  # Or maybe just slice_count, but I suspect file size plays a significant role in how many records per partition is optimal.
+    slice_count=files.count()
+    files=files.repartition(args.num_partitions)  # Or maybe just slice_count, but I suspect file size plays a significant role in how many records per partition is optimal.
 
-    stack=filelist.map(readTiff)
+    stack=files.map(readTiff)
     if not args.nocache:
         stack.cache()
 
@@ -169,7 +169,6 @@ if __name__ == "__main__":
 
     #thresholds.foreach(savetxt)
     thresh=thresholds.reduce(avg)
-    print("threshold is %f"%thresh[1])
     
     # apply threshold to entire stack
     thresholds=sc.emptyRDD()
@@ -180,13 +179,23 @@ if __name__ == "__main__":
 
     # save output slices
     outdir=args.dst+"/output-pct"+str(threshold_percent)+"-sigma"+str(gaussian_sigma)+"__thresh"+str(thresh[1])
-    print("outdir is "+outdir)
+    #print("outdir is "+outdir)
     from os import makedirs
     try:
         makedirs(outdir)
     except Exception as e:
-        print("exception: "+str(e))
+        #print("ignored exception: "+str(e))
         pass
-    stack.foreach(lambda x: savebin(x,outdir))
+    #stack.foreach(lambda x: savebin(x,outdir))   # causes a lot of variation in data collection, proportional expense to input, so not writing for testing
     
+    tend=time.time()
+    total_time=tend-tbegin
+
+    str="total_time pct sigma num_partitions num_slices cached_slices granular_ops computed_threshold\n%0.6f %0.2f %0.1f %d %d %s %s %f"%(total_time,threshold_percent,gaussian_sigma,args.num_partitions,slice_count,str(not args.nocache),str(args.granular),thresh[1])
+    print(str)
+    import tempfile
+    outfile = tempfile.NamedTemporaryFile(delete=False,prefix="/projects/visualization/cam/experiment-logs/aps_threshold-")
+    outfile.write(str+'\n')
+    outfile.close()
+
     sc.stop()
