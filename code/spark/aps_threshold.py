@@ -20,6 +20,23 @@ def readTiff(name):
     print("image range: "+str(img.min())+" to "+str(img.max()))
     return ([num],img,1)  # (slice, data, running_average_count)
 
+def crop(x):
+    import skimage.util
+    return (x[0],x[1][50:100,50:-100],1)
+
+def smooth(x,sigma):
+    import skimage.filter
+    return (x[0],skimage.filter.gaussian_filter(x[1],sigma),1)
+
+def thresh(x):
+    import skimage.filter
+    img=x[1]
+    sdv=img.std(); mean=img.mean()
+    img=img[img<(mean+sdv)]
+    img=img[img>(mean-sdv)]
+    thresh=skimage.filter.threshold_otsu(img)
+    return (x[0],thresh,1)
+
 def threshold(x,sigma):
     """crop and smooth image, then calculate multithreshold"""
     import skimage.filter,skimage.util
@@ -41,6 +58,13 @@ def smooth_and_apply_threshold(x,sigma,thresh):
     """smooth and apply the given threshold"""
     import skimage.filter
     img=skimage.filter.gaussian_filter(x[1],sigma)
+    img[img<thresh]=0.15
+    img[img>thresh]=0.85
+    return (x[0],img,1)
+
+def apply_threshold(x,thresh):
+    """apply the given threshold"""
+    img=x[1]
     img[img<thresh]=0.15
     img[img>thresh]=0.85
     return (x[0],img,1)
@@ -78,7 +102,7 @@ def genfilelist(path,ext):
     import os, os.path, tempfile
     files = os.listdir(path)
     filelist =  [ os.path.join(path,f) for f in files if f.endswith(ext) ]
-    outfile = tempfile.NamedTemporaryFile(delete=False)
+    outfile = tempfile.NamedTemporaryFile(delete=False,prefix="/projects/visualization/cam/scratch/")
     for f in filelist:
         outfile.write(f + '\n')
     outfile.close()
@@ -94,6 +118,9 @@ if __name__ == "__main__":
     parser.add_argument("-p","--percent",type=float,default=0.3,help="filelist containing names of input files")
     parser.add_argument("-s","--sigma",type=float,default=5,help="sigma to use for gaussing smoothing")
     parser.add_argument("-d","--dst",default="/tmp",help="destination path")
+    parser.add_argument("-n","--num_partitions",type=int,default=16,help="number of partitions to create, each with num_files/num_partitions records")
+    parser.add_argument('--nocache', dest='nocache',default=False,action='store_true',help="cache image stack before thresholding")
+    parser.add_argument('--granular', dest='granular',default=False,action='store_true',help="granular image processing operations (vs grouped)")
     args = parser.parse_args()
 
     threshold_percent=args.percent
@@ -101,15 +128,29 @@ if __name__ == "__main__":
 
     sc = SparkContext(appName="APS_Thresholder")
 
-    if args.path != None:
-        filelist = genfilelist(args.path, args.ext)
-        filelist = sc.textFile(filelist, 48)
-    else:
-        filelist=sc.textFile(args.filelist,48)   # try to create at least one partition per core (alternatively, create one partition per node (48 vs 4)
+    import time
+    t0=tbegin=time.time()
 
-    stack=filelist.map(readTiff).cache()
+    files=sc.emptyRDD()
+    if args.path != None:
+        filelist = genfilelist(args.path, args.ext)     #note: occasional problem here when worker tries to read unsynced nfs file, use filelist instead
+        files = sc.textFile(filelist)
+    else:
+        files=sc.textFile(args.filelist)
+
+    # threshold_stack.foreach(noop)  #useful to force pipeline to execute for debugging
+    # tmark=time.time()
+    # print("generate and read files: %0.6f"%(tmark-to))
+    # t0=tmark
+
+    slice_count=files.count()
+    files=files.repartition(args.num_partitions)  # Or maybe just slice_count, but I suspect file size plays a significant role in how many records per partition is optimal.
+
+    stack=files.map(readTiff)
+    if not args.nocache:
+        stack.cache()
+
     #print("numPartitions(%d,%s): %d"%(stack.id(),stack.name(),stack.getNumPartitions()))
-    slice_count=stack.count()   #note: this is expensive
     #avg = stack.reduce(avg)
     #savebin(avg)
 
@@ -119,24 +160,42 @@ if __name__ == "__main__":
     tmax_idx=slice_count-tmin_idx
     threshold_stack=stack.filter(lambda x: x[0][0]>=tmin_idx and x[0][0]<=tmax_idx)
     #print("partial stack size is %d"%threshold_stack.count())   #remember, .count() is expensive, so don't use it unnecessarily
-    #threshold_stack.foreach(noop)  #useful to force pipeline to execute for debugging
-    thresholds=threshold_stack.map(lambda x: threshold(x,gaussian_sigma))
+
+    thresholds=sc.emptyRDD()
+    if args.granular:
+        thresholds=threshold_stack.map(crop).map(lambda x: smooth(x,gaussian_sigma)).map(thresh)
+    else:
+        thresholds=threshold_stack.map(lambda x: threshold(x,gaussian_sigma))
+
     #thresholds.foreach(savetxt)
     thresh=thresholds.reduce(avg)
-    print("threshold is %f"%thresh[1])
     
     # apply threshold to entire stack
-    stack=stack.map(lambda x: smooth_and_apply_threshold(x,gaussian_sigma,thresh[1]))
+    thresholds=sc.emptyRDD()
+    if args.granular:
+        stack=stack.map(lambda x: smooth(x,gaussian_sigma)).map(lambda x: apply_threshold(x,thresh[1]))
+    else:
+        stack=stack.map(lambda x: smooth_and_apply_threshold(x,gaussian_sigma,thresh[1]))
 
     # save output slices
     outdir=args.dst+"/output-pct"+str(threshold_percent)+"-sigma"+str(gaussian_sigma)+"__thresh"+str(thresh[1])
-    print("outdir is "+outdir)
+    #print("outdir is "+outdir)
     from os import makedirs
     try:
         makedirs(outdir)
     except Exception as e:
-        print("exception: "+str(e))
+        #print("ignored exception: "+str(e))
         pass
-    stack.foreach(lambda x: savebin(x,outdir))
+    #stack.foreach(lambda x: savebin(x,outdir))   # causes a lot of variation in data collection, proportional expense to input, so not writing for testing
     
+    tend=time.time()
+    total_time=tend-tbegin
+
+    str="total_time pct sigma num_partitions num_slices cached_slices granular_ops computed_threshold\n%0.6f %0.2f %0.1f %d %d %s %s %f"%(total_time,threshold_percent,gaussian_sigma,args.num_partitions,slice_count,str(not args.nocache),str(args.granular),thresh[1])
+    print(str)
+    import tempfile
+    outfile = tempfile.NamedTemporaryFile(delete=False,prefix="/projects/visualization/cam/experiment-logs/aps_threshold-")
+    outfile.write(str+'\n')
+    outfile.close()
+
     sc.stop()
