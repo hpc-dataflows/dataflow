@@ -18,22 +18,15 @@ if [ $# -gt 3 ]; then
 fi
 
 #make sure spark-hostname file isn't still kicking around
-if [ -e ~/visus-hostname ]; then
-  rm ~/visus-hostname
+if [ -e ~/spark-hostname ]; then
+  rm ~/spark-hostname
 fi
 
 # submit
 qsub -n $nodes -t $time -A $allocation -q pubnet${enable_x11} /home/camc/bin/start-spark.sh
 
-count=0
 while [ ! -e ~/spark-hostname ]; do 
-  echo "Waiting for Spark to launch..."; sleep 3
-  count=$((count+1))
-  if [ $count -gt 20 ]
-  then
-    echo "Spark failed to launch within one minute."
-    break
-  fi
+  echo "Waiting for Spark to launch..."; sleep 5
 done
 
 cat ~/spark-hostname
