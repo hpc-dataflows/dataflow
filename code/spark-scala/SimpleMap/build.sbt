@@ -1,4 +1,4 @@
-name := "dataflow-scala"
+name := "SimpleMap"
 
 version := "0.1"
 
