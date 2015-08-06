@@ -1,12 +1,9 @@
-import org.apache.spark.SparkContext
-import scopt._
 
 class SimpleMap {
 
-  import java.io.File
   case class Config(src: String = "", dst: String = "",
                     blocks: Int = 0, blockSize: Int = 0, nparts : Int = 1,
-                    size: Int = 1, nodes: 1)
+                    size: Int = 1, nodes: Int = 1)
 
   def nanoTime[R](block: => R): (Double, R) = {
     val t0 = System.nanoTime()
@@ -42,13 +39,12 @@ class SimpleMap {
     }
     // parser.parse returns Option[C]
     parser.parse(args, Config()) map { config =>
-      return config
+      config
     } getOrElse {
-      // arguments are bad, usage message will have been displayed
+      None
     }
   }
-
-  def main(args: Array[String]) {\
-    parseCommandLine(args)
-  }ß
+  def main(args: Array[String]) {
+    val config = parseCommandLine(args)
+  }
 }
