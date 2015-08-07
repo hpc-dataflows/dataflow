@@ -18,4 +18,4 @@ size=$((nblocks*block_sz))
 echo "size: $size"
 echo "nparts: ${nparts}"
 echo "test_block_size ${1} ${app} cores=${nodes} dst=${dst} nblocks=${nblocks} block_size=${block_sz} partition_multiplier=${nparts}"
-time $HOME/code/spark/bin/spark-submit --master spark://${1}:7077 ${app} --generate ${nblocks} ${block_sz} --dst ${dst} -n ${3} -z ${size} -p ${nparts} >> /projects/visualization/cam/experiment-logs/test_block_size-${nodes}nodes-${size}gb.out 2>&1 
+time $HOME/code/spark/bin/spark-submit --master spark://${1}:7077 ${app} --generate ${nblocks} ${block_sz} --dst ${dst} -n ${3} -z ${size} -p ${nparts} >> /projects/visualization/cam/experiment-logs/test_block_size-${nodes}nodes-${size}mb.out 2>&1 

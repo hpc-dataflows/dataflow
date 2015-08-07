@@ -1,21 +1,18 @@
 #! /bin/bash
 
-# Usage:   submit-spark.sh <allocation> <time> <num_nodes> [enable_x11]
-# Example: submit-spark.sh SDAV 08:00:00 12
+# Usage:   submit-spark.sh <allocation> <time> <num_nodes> <queue>
+# Example: submit-spark.sh SDAV 08:00:00 12 pubnet-nox11
 
-if [ $# -lt 3 ]; then
-    echo "Usage: submit-spark.sh <allocation> <time> <num_nodes> [enable_x11]"
+if [ $# -lt 4 ]; then
+    echo "Usage: submit-spark.sh <allocation> <time> <num_nodes> <queue>"
+    echo "Example: submit-spark.sh SDAV 08:00:00 12 pubnet-nox11"
     exit -1
 fi
 
 allocation=$1
 time=$2
 nodes=$3
-
-enable_x11="-nox11"
-if [ $# -gt 3 ]; then
-    enable_x11=""
-fi
+queue=$4
 
 #make sure spark-hostname file isn't still kicking around
 if [ -e ~/spark-hostname ]; then
@@ -23,7 +20,7 @@ if [ -e ~/spark-hostname ]; then
 fi
 
 # submit
-qsub -n $nodes -t $time -A $allocation -q pubnet${enable_x11} /home/camc/bin/start-spark.sh
+qsub -n $nodes -t $time -A $allocation -q ${queue} /home/camc/bin/start-spark.sh
 
 while [ ! -e ~/spark-hostname ]; do 
   echo "Waiting for Spark to launch..."; sleep 5
