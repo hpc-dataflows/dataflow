@@ -1,7 +1,7 @@
 """
-A -> B map microbenchmark.
+[A,A,A,A,A] -> B reduce microbenchmark.
 
-Reads FILESIZE/24 double vectors per record. This is more memory efficient than reading one vector per record.
+Calculates average of a set of binary vectors.
 
 Requires NumPy (http://www.numpy.org/).
 """
@@ -17,42 +17,41 @@ def generate(x,block_count):
     print("(%d) generating %d vectors..."%(x,block_count))
     a,b=-1000,1000
     arr=(b-a)*np.random.random_sample((block_count,3))+a
-    return (x,arr)
+    return ([x],arr,1) #id,arr,nblocks
     
-def parseVectors(bin):
-    arr= np.fromstring(bin[1],dtype=np.float64)
-    arr=arr.reshape(arr.shape[0]/3,3)
-    return (bin[0],arr)
-
-def add_vec3(arr,vec):
-    for i in xrange(len(arr[1])):
-        arr[1][i] += vec
-    return arr
+def avg_vec3(a,b):
+    print("a: "+str(a)+" b: "+str(b))
+    avg = (a[2]*a[1]+b[2]*b[1])/(a[2]+b[2])
+    ids=a[0]; ids.extend(b[0])
+    return (ids,avg,a[2]+b[2])
 
 def avg_vec3_arr(arr):
+    print("arr: "+str(arr))
+    nelems=len(arr[1])
     avg=np.array([0.0,0.0,0.0])
-    for i in xrange(len(arr[1])):
+    for i in xrange(nelems):
         avg += arr[1][i]
-    avg/=len(arr[1])
-    return (arr[0],avg)
+    avg/=nelems
+    return (arr[0],avg,nelems)
 
-def savebin(arr,dst):
-    import re
-    # expects input names of the form <name>X-##?.bin (ex: imageA-3.bin, imageK-97.bin)
-    idx=re.match(".*(.-..?)\.bin",arr[0]).group(1) # terribly specific
-    outfilename=dst+"/output-"+str(idx)+".bin"
-    outfile=open(outfilename,'w')
-    outfile.write(arr[1].data)
-    #outfile.write(str(arr[1].shape)+"\n")
+def avg_vec3_arrs(arr0,arr1):
+    print("entering avg_vec3_arrs...")
+    avg0=avg_vec3_arr(arr0)
+    avg1=avg_vec3_arr(arr1)
+    avg=avg_vec3(avg0,avg1)
+    print("avg_vec3_arrs: idx="+str(ids)+" avg="+str(avg))
+    return avg
 
 def saveavg(arr,dst):
-    import re
-    # expects input names of the form <name>X-##?.bin (ex: imageA-3.bin, imageK-97.bin)
-    #idx=re.match(".*(.-..?)\.bin",arr[0]).group(1) # terribly specific
-    idx=arr[0] #generated data just has the index
-    outfilename=dst+"/average-"+str(idx)+".txt"
+    print("saveavg: arr="+str(arr))
+    from glob import glob
+    name=dst+'/simple_reduce_average-'
+    idx=len(glob(name+'*.txt'))
+    outfilename=name+str(idx).zfill(2)+".txt"
     outfile=open(outfilename,'w')
-    outfile.write(str(arr[1]))
+    outfile.write("average: "+str(arr[1])+"\n")
+    outfile.write("nvecs: "+str(arr[2])+"\n")
+    outfile.write("partition_ids: "+str(arr[0])+"\n")
 
 def noop(x):
     pass #print("noop")
@@ -61,15 +60,14 @@ if __name__ == "__main__":
 
     import argparse
     parser = argparse.ArgumentParser(description="Simple Map Microbenchmark")
-    parser.add_argument("-s","--src",help="directory containing input files")
     parser.add_argument("-d","--dst",help="directory to write output files")
-    parser.add_argument("-g","--generate",type=int,nargs=2,default=[0,0],help="generate <m> blocks of size <k> (in MB) data instead of loading from files")
-    parser.add_argument("-n","--nodes",type=int,required=True,help="number of nodes (for reporting)")
+    parser.add_argument("-g","--generate",type=int,required=True,nargs=2,default=[0,0],help="generate <m> blocks of size <k> (in MB) data instead of loading from files")
+    parser.add_argument("-n","--nodes",type=int,required=True,help="number of nodes")
     parser.add_argument("-p","--nparts",type=int,default=1,help="how many partitions to create per node")
-    parser.add_argument("-z","--size",type=int,required=True,help="input size (in gb, for reporting)")
+    parser.add_argument("-f","--fast",default=False,action="store_true",help="calculate averages per-partition locally before reducing")
     args = parser.parse_args()
 
-    sc = SparkContext(appName="SimpleMap")
+    sc = SparkContext(appName="SimpleReduce")
 
     # write results
     outdir=args.dst+"/results"
@@ -82,75 +80,62 @@ if __name__ == "__main__":
         pass
 
     from glob import glob
-    name=args.dst+'/simple_map-n'+str(args.nodes*12)+'-'+str(args.size)+'gb-'
-    idx=len(glob(name+'*.txt'))
-    outfilename=name+str(idx).zfill(2)+".txt"
-    outfile=open(outfilename,'w')
-    outfile.write("cores: "+str(args.nodes*12)+"\n")
-    outfile.write("data size: "+str(args.size)+"\n")
     gen_num_blocks,gen_block_size=args.generate
-
-    # read input files or generate input data
-    import time
-    t0=tbegin=time.time()
-
-    if gen_num_blocks>0 and gen_block_size>0:
-        rdd=sc.parallelize(range(gen_num_blocks),args.nodes*12*args.nparts)
-        gen_block_count=gen_block_size*1E6/24  # 24 bytes per vector
-        print("generating %d blocks of %d vectors each..."%(gen_num_blocks,gen_block_count))
-        outfile.write("generating data...\n")
-        outfile.write("partition_multiplier: "+str(args.nparts)+"\n")
-        outfile.write("gen_num_blocks: "+str(gen_num_blocks)+"\n")
-        outfile.write("gen_block_size: "+str(gen_block_size)+"\n")
-        outfile.write("total_data_size: "+str(gen_num_blocks*gen_block_size)+"\n")
-        A=rdd.map(lambda x:generate(x,gen_block_count))
-    elif args.src:
-        outfile.write("reading data...\n")
-        outfile.write(args.src+"\n")
-        rdd = sc.binaryFiles(args.src)
-        A = rdd.map(parseVectors)
-    else:
-        print("either --src or --generate must be specified")
+    if not gen_num_blocks>0 and gen_block_size>0:
+        print("arguments to --generate must be positive")
         sc.stop();
         from sys import exit
         exit(-1)
 
+    name=args.dst+'/simple_reduce-n'+str(args.nodes*12)+'-'+str(args.generate[0])+'-'+str(args.generate[1])+'-'
+    idx=len(glob(name+'*.txt'))
+    outfilename=name+str(idx).zfill(2)+".txt"
+    outfile=open(outfilename,'w')
+    outfile.write("cores: "+str(args.nodes*12)+"\n")
+    outfile.write("data size: "+str(gen_num_blocks*gen_block_size)+"\n")
+
+    # generate input data
+    import time
+    t0=tbegin=time.time()
+
+    rdd=sc.parallelize(range(gen_num_blocks),args.nodes*12*args.nparts)
+    gen_block_vec_count=gen_block_size*1E6/24  # 24 bytes per vector
+    print("generating %d blocks of %d vectors each..."%(gen_num_blocks,gen_block_vec_count))
+    outfile.write("generating data...\n")
+    outfile.write("partition_multiplier: "+str(args.nparts)+"\n")
+    outfile.write("gen_num_blocks: "+str(gen_num_blocks)+"\n")
+    outfile.write("gen_block_size: "+str(gen_block_size)+"\n")
+    outfile.write("total_data_size: "+str(gen_num_blocks*gen_block_size)+"\n")
+    A=rdd.map(lambda x:generate(x,gen_block_vec_count))
+
     #rdd.foreach(noop)  #useful to force pipeline to execute for debugging
     tmark=time.time()
-    outfile.write("read/parse or generate partitions: %0.6f\n"%(tmark-t0))
-    #outfile.write("numPartitions(%d,%s): %d"%(A.id(),A.name(),A.getNumPartitions()))
+    outfile.write("generate partitions: %0.6f\n"%(tmark-t0))
+    outfile.write("numPartitions(%d,%s): %d\n"%(A.id(),A.name(),A.getNumPartitions()))
     t0=tmark
 
-    # apply simple operation (V'=V+V0)
-    shift=np.array([25.25,-12.125,6.333],dtype=np.float64)
-    B = A.map(lambda x: add_vec3(x,shift))
-    #outfile.write("numPartitions(%d,%s): %d"%(B.id(),B.name(),B.getNumPartitions()))
+    # calculate average
+    avg=0.0
+    if args.fast:
+        avg=A.map(avg_vec3_arr).reduce(avg_vec3)
+    else:
+        avg=A.reduce(avg_vec3_arrs)
 
     #B.foreach(noop)  #useful to force pipeline to execute for debugging
     tmark=time.time()
-    outfile.write("simple map (V'=V0+V): %0.6f\n"%(tmark-t0))
+    outfile.write("simple reduce (avg): %0.6f\n"%(tmark-t0))
     t0=tmark
 
     # write results
-    #B.foreach(lambda x: savebin(x,outdir))
-
-    B_avg=B.map(avg_vec3_arr)
-
-    #B.foreach(noop)  #useful to force pipeline to execute for debugging
-    tmark=time.time()
-    outfile.write("calculate per-partition average: %0.6f\n"%(tmark-t0))
-    t0=tmark
-
-    B_avg.foreach(lambda x: saveavg(x,outdir))
+    saveavg(avg,outdir)
+    print("average: "+str(avg[1]))
+    print("nvecs: "+str(avg[2]))
+    print("partition_ids: "+str(avg[0]))
 
     #B.foreach(noop)  #useful to force pipeline to execute for debugging
     tmark=time.time()
     outfile.write("write results: %0.6f\n"%(tmark-t0))
     t0=tmark
 
-    # used with .cache() above to examine RDD memory usage
-    # import time
-    # while True:
-    #     time.sleep(5)
-
+    outfile.close()
     sc.stop()

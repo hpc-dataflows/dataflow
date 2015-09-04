@@ -66,7 +66,7 @@ if __name__ == "__main__":
     parser.add_argument("-g","--generate",type=int,nargs=2,default=[0,0],help="generate <m> blocks of size <k> (in MB) data instead of loading from files")
     parser.add_argument("-n","--nodes",type=int,required=True,help="number of nodes (for reporting)")
     parser.add_argument("-p","--nparts",type=int,default=1,help="how many partitions to create per node")
-    parser.add_argument("-z","--size",type=int,required=True,help="input size (in gb, for reporting)")
+    parser.add_argument("-z","--size",type=int,required=True,help="input size (in mb, for reporting)")
     args = parser.parse_args()
 
     sc = SparkContext(appName="SimpleMap")
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         pass
 
     from glob import glob
-    name=args.dst+'/simple_map-n'+str(args.nodes*12)+'-'+str(args.size)+'gb-'
+    name=args.dst+'/simple_map-n'+str(args.nodes*12)+'-'+str(args.size)+'mb-'
     idx=len(glob(name+'*.txt'))
     outfilename=name+str(idx).zfill(2)+".txt"
     outfile=open(outfilename,'w')
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     #rdd.foreach(noop)  #useful to force pipeline to execute for debugging
     tmark=time.time()
     outfile.write("read/parse or generate partitions: %0.6f\n"%(tmark-t0))
-    #outfile.write("numPartitions(%d,%s): %d"%(A.id(),A.name(),A.getNumPartitions()))
+    outfile.write("numPartitions(%d,%s): %d\n"%(A.id(),A.name(),A.getNumPartitions()))
     t0=tmark
 
     # apply simple operation (V'=V+V0)
@@ -153,4 +153,5 @@ if __name__ == "__main__":
     # while True:
     #     time.sleep(5)
 
+    outfile.close()
     sc.stop()
