@@ -1,0 +1,10 @@
+Build paper:
+
+make TEX_SOURCE_BASE=paper
+
+or 
+
+make
+
+(Added default value for TEX_SOURCE_BASE in Makefile.)
+
