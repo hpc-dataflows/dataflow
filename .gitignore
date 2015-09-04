@@ -18,6 +18,19 @@ tmp/
 paper.ps
 paper.pdf
 *-converted-to.pdf
+*.chk
+*.dvi
+*.log
+*.aux
+*.bbl
+*.blg
+*.ilg
+*.toc
+*.lof
+*.lot
+*.idx
+*.ind
+*.out
 
 # Local configuration file (sdk path, etc)
 local.properties
