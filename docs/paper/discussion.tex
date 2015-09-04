@@ -1,0 +1,191 @@
+\section{Discussion}
+
+
+\paragraph{Meeting Notes}\label{meeting-notes}
+
+\emph{17Jun}
+
+1.
+\href{https://docs.google.com/document/d/1fq3z1-oEcCBhjKA__vl8LsVm3-uArJik7YFLYvYoN1Y/edit?usp=sharing}{\emph{spark
+		on cooley}}
+
+- verify number of threads is actually correct, that we can
+control/monitor threading
+
+o identify multiple threads/worker
+
+- try to load binary data (aps data or bio data)
+
+o partition a huge binary file
+
+o load a directory of smaller binary files
+
+- use /projects/SDAV/cam directory, which is persistent
+
+note: file(s) must be accessible to all workers, either through shared
+path or hdfs/tachyon/etc
+
+- when multiple files are read (or one big file is split) where does the
+data go?
+
+- dissect RDD (esp in context of binary blob):
+
+o is RDD different than Tachyon or do RDD blocks get written using
+Tachyon (or HDFS, etc)?
+
+o what data models does it support?
+
+o how does it handle fault tolerance?
+
+o what about transformation/views? (rows vs columns, more generally
+chunks/blocks)
+
+o when/how is the data replicated?
+
+- explore pipelines
+
+1b.
+\href{https://docs.google.com/document/d/1lyzEHap1EznES0DKiMa3fsalepqPD6vnbZqSEMjCVPQ/edit?usp=sharing}{\emph{spark
+		on magellan}}
+
+- ceph (distributed file system looking thing, ask Dan Olsen about it)
+
+- ...
+
+2. spark streaming, pipelines
+
+articulate pipeline stages (microbenchmarks):
+
+- map
+
+- flatmap
+
+- reduce
+
+- reducemap (e.g. aggregation for file i/o)
+
+- ?
+
+once we introduce, it makes sense to talk about rates of production and
+consumption for each pipeline component, and how we can make them work
+together sanely ("frame dropping", etc)
+
+- add another stage, now rates of production/consumption matter
+
+evaluate (application benchmarks):
+
+- data sizes
+
+- data rates
+
+- \# of stages
+
+- system scale
+
+- M:N coupling (in flatmaps/reducemaps, fan-in/fan-out degress)
+
+- hw
+
+- spilling?
+
+- magellan vs cooley (shared storage vs node-level storage)
+
+3. plan for summer
+
+- Try a real problem on both cooley and magellan, compare pros and cons.
+
+- ideas: aps data analysis, biology data, and even convert it to idx at
+the end and attach a visus viewer.
+
+- could use an existing spark analysis (such as their machine learning
+module), or create our own
+
+Understanding the overall system and tradeoffs and how cloud-iness can
+help hpc will be a good contribution.
+
+- could also have an mpi app that does the same thing to compare
+performance
+
+week 3-7 - explore and code
+
+week 8-9 - benchmarking (aps, bioinformatics, or both)
+
+week 10 - write report/paper
+
+w3:
+
+- google doc
+
+- pipelines/streaming investigation
+
+- spark running on Magellan
+
+- binary data importing and RDD dissection
+
+w4:
+
+- start APS/BIO
+
+- pipelining/streaming benchmark
+
+- explore pegasus a little. We know the project lead (Eva Delman) so we
+can ask questions. This is mainly to have a notion of related work.
+
+- rdd vs tachyon?
+
+w5:
+
+- refine aps/bio app
+
+- identify analyses
+
+w6:
+
+- 2nd app (either the aps or the bio)
+
+- (spillover from prev weeks)
+
+w7:
+
+- finish and have working apps
+
+\emph{15Jun}
+
+Pegasus mpi*, Legion, Uintah task graph,
+
+Create a simulator using mpi/spark, try different dataflows
+
+Different "feeds" produce at different rates,
+
+Have different "coupling" characteristics (\#consumers vs producers)
+
+Different primitives (join, scatter, etc)
+
+Streaming (small chunks), dataflow (overall processing task)
+
+Can we create a benchmark to characterize these types of *in-memory*
+pipelines using these building blocks with their given characteristics?
+
+Including not only dag but also feedback loops.
+
+Challenge is to separate performance from effectiveness of pipeline.
+
+We can try this using both spark and Pegasus using Cooley and Magellan.
+
+Magellan has a lot of flexibility in configuration, so we could even
+using it to test heterogeneous frameworks.
+
+We're going to let some task graph scheduler decide how to schedule the
+Dataflow (default spark and Pegasus ways).
+
+We want to explore dynamic modification of pipelines (eg add a new
+processing node) and speculate as to what Api would be required to
+facilitate this (ex: pause upstream then insert node then resume).
+
+We'll generate examples from meta genomics for which we have in house
+operations, we could also try climate.
+
+First we'll try sample data to debug: gen a big 1d array, compute sum of
+each successive pair, etc
+
+Google doc to track thoughts

@@ -1,0 +1,47 @@
+\section{Introduction}
+
+Our goal is to understand and articulate the characteristics of
+cloud-based dataflow processing in the context of HPC analysis tasks,
+implement sample apps using spark, pegasus, and mpi and evaluate their
+performance on both a supercomputing cluster and a cloud.
+
+We will compare XYZ written in Apache Spark vs. MPI (a traditionally
+used messaging middleware)
+
+The microbenchmarks are chosen based on typical
+computation/communication patterns found in HPC.
+
+We're also looking at Python vs. Scala and whether there are any
+performance differences.
+
+Some words about tuning garbage collection. These folks seem to have
+done some good legwork on same\footnote{https://databricks.com/blog/2015/05/28/tuning-java-garbage-collection-for-spark-applications.html}.
+
+Also simply describe differences between implementation (e.g. lines of
+code).
+
+Out of core: Implicit in Spark
+
+NOTE: we need to clarify what we mean by \emph{dataflow.} Notably, it is a different from its meaning in \emph{compilers} and \emph{computer architecture}:
+\begin{itemize}
+\item
+  \href{https://en.wikipedia.org/wiki/Data-flow_analysis}{\emph{https://en.wikipedia.org/wiki/Data-flow\_analysis}}
+\item
+  https://en.wikipedia.org/wiki/Dataflow\_architecture
+\end{itemize}
+
+\paragraph{Project Resources}\label{project-resources}
+
+\textbf{Github:}
+\href{http://github.com/cchriste/dataflow}{\emph{http://github.com/cchriste/dataflow}}
+
+\textbf{Slack:}
+\href{https://dataflowanalysis.slack.com}{\emph{https://dataflowanalysis.slack.com}}
+
+\textbf{Google Docs:}
+\href{https://drive.google.com/folderview?id=0BxLkEMNd9q6FfmpRaFZXSGlPc0JsSDdVdndCUm83SzN6UnlLVEk5T3ZsZmJ0VEVGREtNTkE\&usp=sharing}{\emph{dataflow\_analysis}}
+
+\textbf{Dropbox:}
+\href{https://www.dropbox.com/sh/odsd9uxe1elbhbf/AAD8J1TGuFY1VHJl2oPdm5E0a?dl=0}{\emph{spark\_hpc}}
+
+

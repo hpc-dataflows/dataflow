@@ -1,0 +1,532 @@
+\section{Abstract}\label{abstract}
+
+In the spirit of software engineering, I have applied the separation of
+concerns principle by creating a separate document for the abstract,
+\href{http://drive.google.com/open?id=1lTxG_WOtMI6IbK3NU-cFe6LAKrQKN53Jn0MwpE7m3Xg}{\emph{Big
+Data Processing in Apache Spark (Abstract)}}, since we have to submit it
+separately. I'm going to work on actual paper organization and content
+before Thursday.
+
+\section{Overview}\label{overview}
+
+Our goal is to understand and articulate the characteristics of
+cloud-based dataflow processing in the context of HPC analysis tasks,
+implement sample apps using spark, pegasus, and mpi and evaluate their
+performance on both a supercomputing cluster and a cloud.
+
+We will compare XYZ written in Apache Spark vs. MPI (a traditionally
+used messaging middleware)
+
+The microbenchmarks are chosen based on typical
+computation/communication patterns found in HPC.
+
+We're also looking at Python vs. Scala and whether there are any
+performance differences.
+
+Some words about tuning garbage collection. These folks seem to have
+done some good legwork on same\footnote{https://databricks.com/blog/2015/05/28/tuning-java-garbage-collection-for-spark-applications.html}.
+
+Also simply describe differences between implementation (e.g. lines of
+code).
+
+Out of core: Implicit in Spark
+
+NOTE: we need to clarify what we mean by \emph{dataflow.}
+
+\begin{itemize}
+\item
+  \begin{quote}
+  Use in compilers:
+  \href{https://en.wikipedia.org/wiki/Data-flow_analysis}{\emph{https://en.wikipedia.org/wiki/Data-flow\_analysis}}
+  \end{quote}
+\item
+  \begin{quote}
+  Dataflow architecture,
+  https://en.wikipedia.org/wiki/Dataflow\_architecture
+  \end{quote}
+\end{itemize}
+
+\section{Project Resources}\label{project-resources}
+
+\textbf{Github:}
+\href{http://github.com/cchriste/dataflow}{\emph{http://github.com/cchriste/dataflow}}
+
+\textbf{Slack:}
+\href{https://dataflowanalysis.slack.com}{\emph{https://dataflowanalysis.slack.com}}
+
+\textbf{Google Docs:}
+\href{https://drive.google.com/folderview?id=0BxLkEMNd9q6FfmpRaFZXSGlPc0JsSDdVdndCUm83SzN6UnlLVEk5T3ZsZmJ0VEVGREtNTkE\&usp=sharing}{\emph{dataflow\_analysis}}
+
+\textbf{Dropbox:}
+\href{https://www.dropbox.com/sh/odsd9uxe1elbhbf/AAD8J1TGuFY1VHJl2oPdm5E0a?dl=0}{\emph{spark\_hpc}}
+
+My dropbox id is gkt@cs.luc.edu
+
+\section{Dataflows}\label{dataflows}
+
+\subsection{Components/Pipeline Stages}\label{componentspipeline-stages}
+
+\begin{itemize}
+\item
+  \begin{quote}
+  map
+  \end{quote}
+\item
+  \begin{quote}
+  flatmap
+  \end{quote}
+\item
+  \begin{quote}
+  reduce
+  \end{quote}
+\item
+  \begin{quote}
+  reducemap (ex: aggregation for file i/o)
+  \end{quote}
+\item
+  \begin{quote}
+  other?
+  \end{quote}
+\end{itemize}
+
+\subsection{Multistage}\label{multistage}
+
+Result of one computation feeds into the next, for example a \emph{map}
+to another \emph{map}.
+
+\subsection{Streaming}\label{streaming}
+
+Computation performed over moving window.
+
+\subsection{Evaluating Performance}\label{evaluating-performance}
+
+Assessing the various components based on their rates of production and
+consumption.
+
+\subsection{To DAG or not to DAG}\label{to-dag-or-not-to-dag}
+
+Some dataflows can have feedback..
+
+\section{Dataflow Processing
+Frameworks}\label{dataflow-processing-frameworks}
+
+\subsection{Spark}\label{spark}
+
+Spark is a general purpose cluster computing system similar to Hadoop.
+It provides a new data abstraction that facilitates fast sharing and
+history-based resilience, as well as an expanded set of data
+transformation and actions, in addition to traditional map-reduce. In
+addition, Spark provides a streaming processing abstraction as well as
+bindings to common processing languages such as GraphX, R, and MLlib.
+
+Spark is \emph{lazy,} and this philosophy underlies much of its design.
+Computations will not be performed until their result is requested and
+data will not be consolidated or repartitioned unless explicitly
+requested.
+
+\subsubsection{Running}\label{running}
+
+Basics of job submission and execution.
+
+\href{https://docs.google.com/document/d/1fq3z1-oEcCBhjKA__vl8LsVm3-uArJik7YFLYvYoN1Y/edit?usp=sharing}{\emph{running
+spark on cooley}}
+
+\href{https://docs.google.com/document/d/1lyzEHap1EznES0DKiMa3fsalepqPD6vnbZqSEMjCVPQ/edit?usp=sharing}{\emph{running
+spark on magellan}}
+
+\subsubsection{Resilient Distributed
+Data}\label{resilient-distributed-data}
+
+When a dataset is loaded by Spark, it becomes an immutable RDD. This
+abstraction allows the data to be treated as a whole when in fact it may
+be partitioned across many nodes of a distributed system. Each partition
+also contains the history of transformations with which it was created,
+called a \emph{lineage}, with which the partition can be recomputed if
+necessary, such as in the case of a node failure. This lineage is a more
+compact form of resiliency compared to data duplication as utilized by
+Hadoop.
+
+An RDD is split into \emph{partitions} whose size is at minimum the size
+of a block on whatever storage device is being utilized (e.g. 32MB).
+Each partition is further divided into \emph{records}, typically a
+single line for text processing, or an entire binary file for binary
+data. Binary data records can be explicitly specified. Large binary
+files will be broken down into multiple partitions only if these
+partitions can themselves be divided into records.
+
+Spark distributes the blocks/data among the workers, if it does at all.
+
+o is RDD different than Tachyon or do RDD blocks get written using
+Tachyon (or HDFS, etc)?
+
+o what data models does it support?
+
+o how does it handle fault tolerance?
+
+o what about transformation/views? (rows vs columns, more generally
+chunks/blocks)
+
+o when/how is the data replicated?
+
+\subsubsection{}\label{section}
+
+\paragraph{Storage Levels}\label{storage-levels}
+
+RDDs can be stored in memory, on disk, a combination of the two, or off
+heap (using Tachyon). MEMORY\_ONLY
+
+Partitions that do not fit in memory will be recomputed from their
+history when they are needed.
+
+\subparagraph{DISK\_ONLY}\label{diskux5fonly}
+
+All partitions are stored on disk, just like Hadoop.
+
+RDD partitions can be optionally replicated across up to two nodes. An
+RDD partition must be small enough to fit
+
+\paragraph{Persistence}\label{persistence}
+
+RDDs can be persisted in memory for fast access between successive
+operations. This is particularly important for iterative algorithms that
+reuse some intermediate result. An RDD will be persisted according to
+its specified storage level. Caches are cleared according to a least
+recently used policy, or manually using RDD.unpersist()
+
+\paragraph{Input}\label{input}
+
+In order to get binary data into spark, we use the binaryFiles or
+binaryRecords SparkContext functions. Both will read a directory filled
+with binary files. The first will create one record per file, while the
+second will partition files into records of an explicitly stated number
+of bytes. For example, the following line will create an RDD with
+partitions containing records of size float{[}3{]}:
+
+vecs = sc.binaryRecords(sys.argv{[}1{]}, 12)
+
+The binary data is read into a string. If you want to use the data as a
+numpy array, the numpy.fromstring function can be used:
+
+arr= np.fromstring(vec, dtype=np.float32)
+
+This function can be used by RDD.map in order to convert the string
+records into numpy records:
+
+data = vecs.map(parseVector)
+
+\subsubsection{Streaming}\label{streaming-1}
+
+How to run spark in streaming mode.
+
+\subsubsection{Spark and Tachyon}\label{spark-and-tachyon}
+
+How do they work together? Are the performance characteristics
+different?
+
+Is it the same as ceph on Magellan? (ask Dan Olsen about ceph)
+
+\subsection{Pegasus}\label{pegasus}
+
+todo
+
+\subsection{MPI}\label{mpi}
+
+todo: reference implementation
+
+\section{System Architectures}\label{system-architectures}
+
+\subsection{Cooley}\label{cooley}
+
+225Tflop cluster with 40Tb memory, shared disk + 355Tb local disk per
+node, ...
+
+\subsection{Magellan}\label{magellan}
+
+7000 node cloud, no shared disk, per-node provisioning flexibility,
+\ldots{}
+
+\section{Sample Applications}\label{sample-applications}
+
+\subsection{APS}\label{aps}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \begin{quote}
+  analyze image stacks from advanced photon source
+  \end{quote}
+\item
+  \begin{quote}
+  save results as IDX
+  \end{quote}
+\end{enumerate}
+
+Our first sample application comes from a materials scientist who
+utilizes the Advanced Photon Source (APS) to scan the construction of a
+polymer material that could be used for nanoscale circuit printing. We
+received an image stack from the APS as well as a sample Matlab script
+and reproduced the results using the Spark framework.
+
+Details can be found here.
+
+\subsection{Bioinformatics}\label{bioinformatics}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \begin{quote}
+  look for patterns in genome streams
+  \end{quote}
+\item
+  \begin{quote}
+  and stuff
+  \end{quote}
+\end{enumerate}
+
+\subsection{EVS}\label{evs}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \begin{quote}
+  look for patterns in genome streams
+  \end{quote}
+\item
+  \begin{quote}
+  and stuff
+  \end{quote}
+\end{enumerate}
+
+\section{Evaluation}\label{evaluation}
+
+\subsection{Pipeline Benchmarks}\label{pipeline-benchmarks}
+
+\begin{itemize}
+\item
+  \begin{quote}
+  map
+  \end{quote}
+\item
+  \begin{quote}
+  flatmap
+  \end{quote}
+\item
+  \begin{quote}
+  reduce
+  \end{quote}
+\item
+  \begin{quote}
+  reducemap (ex: aggregation for file i/o)
+  \end{quote}
+\item
+  \begin{quote}
+  other?
+  \end{quote}
+\end{itemize}
+
+\subsection{Application Benchmarks}\label{application-benchmarks}
+
+- data sizes
+
+- data rates
+
+- \# of stages
+
+- system scale
+
+- M:N coupling (in flatmaps/reducemaps, fan-in/fan-out degress)
+
+- hw
+
+- spilling?
+
+- magellan vs cooley (shared storage vs node-level storage)
+
+\section{Meeting Notes}\label{meeting-notes}
+
+\emph{17Jun}
+
+1.
+\href{https://docs.google.com/document/d/1fq3z1-oEcCBhjKA__vl8LsVm3-uArJik7YFLYvYoN1Y/edit?usp=sharing}{\emph{spark
+on cooley}}
+
+- verify number of threads is actually correct, that we can
+control/monitor threading
+
+o identify multiple threads/worker
+
+- try to load binary data (aps data or bio data)
+
+o partition a huge binary file
+
+o load a directory of smaller binary files
+
+- use /projects/SDAV/cam directory, which is persistent
+
+note: file(s) must be accessible to all workers, either through shared
+path or hdfs/tachyon/etc
+
+- when multiple files are read (or one big file is split) where does the
+data go?
+
+- dissect RDD (esp in context of binary blob):
+
+o is RDD different than Tachyon or do RDD blocks get written using
+Tachyon (or HDFS, etc)?
+
+o what data models does it support?
+
+o how does it handle fault tolerance?
+
+o what about transformation/views? (rows vs columns, more generally
+chunks/blocks)
+
+o when/how is the data replicated?
+
+- explore pipelines
+
+1b.
+\href{https://docs.google.com/document/d/1lyzEHap1EznES0DKiMa3fsalepqPD6vnbZqSEMjCVPQ/edit?usp=sharing}{\emph{spark
+on magellan}}
+
+- ceph (distributed file system looking thing, ask Dan Olsen about it)
+
+- ...
+
+2. spark streaming, pipelines
+
+articulate pipeline stages (microbenchmarks):
+
+- map
+
+- flatmap
+
+- reduce
+
+- reducemap (e.g. aggregation for file i/o)
+
+- ?
+
+once we introduce, it makes sense to talk about rates of production and
+consumption for each pipeline component, and how we can make them work
+together sanely ("frame dropping", etc)
+
+- add another stage, now rates of production/consumption matter
+
+evaluate (application benchmarks):
+
+- data sizes
+
+- data rates
+
+- \# of stages
+
+- system scale
+
+- M:N coupling (in flatmaps/reducemaps, fan-in/fan-out degress)
+
+- hw
+
+- spilling?
+
+- magellan vs cooley (shared storage vs node-level storage)
+
+3. plan for summer
+
+- Try a real problem on both cooley and magellan, compare pros and cons.
+
+- ideas: aps data analysis, biology data, and even convert it to idx at
+the end and attach a visus viewer.
+
+- could use an existing spark analysis (such as their machine learning
+module), or create our own
+
+Understanding the overall system and tradeoffs and how cloud-iness can
+help hpc will be a good contribution.
+
+- could also have an mpi app that does the same thing to compare
+performance
+
+week 3-7 - explore and code
+
+week 8-9 - benchmarking (aps, bioinformatics, or both)
+
+week 10 - write report/paper
+
+w3:
+
+- google doc
+
+- pipelines/streaming investigation
+
+- spark running on Magellan
+
+- binary data importing and RDD dissection
+
+w4:
+
+- start APS/BIO
+
+- pipelining/streaming benchmark
+
+- explore pegasus a little. We know the project lead (Eva Delman) so we
+can ask questions. This is mainly to have a notion of related work.
+
+- rdd vs tachyon?
+
+w5:
+
+- refine aps/bio app
+
+- identify analyses
+
+w6:
+
+- 2nd app (either the aps or the bio)
+
+- (spillover from prev weeks)
+
+w7:
+
+- finish and have working apps
+
+\emph{15Jun}
+
+Pegasus mpi*, Legion, Uintah task graph,
+
+Create a simulator using mpi/spark, try different dataflows
+
+Different "feeds" produce at different rates,
+
+Have different "coupling" characteristics (\#consumers vs producers)
+
+Different primitives (join, scatter, etc)
+
+Streaming (small chunks), dataflow (overall processing task)
+
+Can we create a benchmark to characterize these types of *in-memory*
+pipelines using these building blocks with their given characteristics?
+
+Including not only dag but also feedback loops.
+
+Challenge is to separate performance from effectiveness of pipeline.
+
+We can try this using both spark and Pegasus using Cooley and Magellan.
+
+Magellan has a lot of flexibility in configuration, so we could even
+using it to test heterogeneous frameworks.
+
+We're going to let some task graph scheduler decide how to schedule the
+Dataflow (default spark and Pegasus ways).
+
+We want to explore dynamic modification of pipelines (eg add a new
+processing node) and speculate as to what Api would be required to
+facilitate this (ex: pause upstream then insert node then resume).
+
+We'll generate examples from meta genomics for which we have in house
+operations, we could also try climate.
+
+First we'll try sample data to debug: gen a big 1d array, compute sum of
+each successive pair, etc
+
+Google doc to track thoughts
