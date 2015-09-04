@@ -105,6 +105,8 @@
 # here's the system dependent stuff
 #
 
+TEX_SOURCE_BASE=paper
+
 ifndef SYNTAXCHK
 SYNTAXCHK = chktex
 endif
