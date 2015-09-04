@@ -1,0 +1,278 @@
+\section{Narrative}
+% TODO: We don't need to call this Narrative. Placeholder name.
+
+\subsection{Dataflows}\label{dataflows}
+
+\subsubsection{Components/Pipeline Stages}\label{componentspipeline-stages}
+
+\begin{itemize}
+\item
+  \begin{quote}
+  map
+  \end{quote}
+\item
+  \begin{quote}
+  flatmap
+  \end{quote}
+\item
+  \begin{quote}
+  reduce
+  \end{quote}
+\item
+  \begin{quote}
+  reducemap (ex: aggregation for file i/o)
+  \end{quote}
+\item
+  \begin{quote}
+  other?
+  \end{quote}
+\end{itemize}
+
+\subsubsection{Multistage}\label{multistage}
+
+Result of one computation feeds into the next, for example a \emph{map}
+to another \emph{map}.
+
+\subsubsection{Streaming}\label{streaming}
+
+Computation performed over moving window.
+
+\subsubsection{Evaluating Performance}\label{evaluating-performance}
+
+Assessing the various components based on their rates of production and
+consumption.
+
+\subsubsection{To DAG or not to DAG}\label{to-dag-or-not-to-dag}
+
+Some dataflows can have feedback..
+
+\subsection{Dataflow Processing Frameworks}\label{dataflow-processing-frameworks}
+
+\subsubsection{Spark}\label{spark}
+
+Spark is a general purpose cluster computing system similar to Hadoop.
+It provides a new data abstraction that facilitates fast sharing and
+history-based resilience, as well as an expanded set of data
+transformation and actions, in addition to traditional map-reduce. In
+addition, Spark provides a streaming processing abstraction as well as
+bindings to common processing languages such as GraphX, R, and MLlib.
+
+Spark is \emph{lazy,} and this philosophy underlies much of its design.
+Computations will not be performed until their result is requested and
+data will not be consolidated or repartitioned unless explicitly
+requested.
+
+\subsubsection{Running}\label{running}
+
+Basics of job submission and execution.
+
+\href{https://docs.google.com/document/d/1fq3z1-oEcCBhjKA__vl8LsVm3-uArJik7YFLYvYoN1Y/edit?usp=sharing}{\emph{running
+spark on cooley}}
+
+\href{https://docs.google.com/document/d/1lyzEHap1EznES0DKiMa3fsalepqPD6vnbZqSEMjCVPQ/edit?usp=sharing}{\emph{running
+spark on magellan}}
+
+\subsubsection{Resilient Distributed Data}\label{resilient-distributed-data}
+
+When a dataset is loaded by Spark, it becomes an immutable RDD. This
+abstraction allows the data to be treated as a whole when in fact it may
+be partitioned across many nodes of a distributed system. Each partition
+also contains the history of transformations with which it was created,
+called a \emph{lineage}, with which the partition can be recomputed if
+necessary, such as in the case of a node failure. This lineage is a more
+compact form of resiliency compared to data duplication as utilized by
+Hadoop.
+
+An RDD is split into \emph{partitions} whose size is at minimum the size
+of a block on whatever storage device is being utilized (e.g. 32MB).
+Each partition is further divided into \emph{records}, typically a
+single line for text processing, or an entire binary file for binary
+data. Binary data records can be explicitly specified. Large binary
+files will be broken down into multiple partitions only if these
+partitions can themselves be divided into records.
+
+Spark distributes the blocks/data among the workers, if it does at all.
+
+o is RDD different than Tachyon or do RDD blocks get written using
+Tachyon (or HDFS, etc)?
+
+o what data models does it support?
+
+o how does it handle fault tolerance?
+
+o what about transformation/views? (rows vs columns, more generally
+chunks/blocks)
+
+o when/how is the data replicated?
+
+\subsubsection{RDDs}\label{section}
+
+\paragraph{Storage Levels}\label{storage-levels}
+
+RDDs can be stored in memory, on disk, a combination of the two, or off
+heap (using Tachyon). MEMORY\_ONLY
+
+Partitions that do not fit in memory will be recomputed from their
+history when they are needed.
+
+\paragraph{DISK\_ONLY}\label{diskux5fonly}
+
+All partitions are stored on disk, just like Hadoop.
+
+RDD partitions can be optionally replicated across up to two nodes. An
+RDD partition must be small enough to fit
+
+\paragraph{Persistence}\label{persistence}
+
+RDDs can be persisted in memory for fast access between successive
+operations. This is particularly important for iterative algorithms that
+reuse some intermediate result. An RDD will be persisted according to
+its specified storage level. Caches are cleared according to a least
+recently used policy, or manually using RDD.unpersist()
+
+\paragraph{Input}\label{input}
+
+In order to get binary data into spark, we use the binaryFiles or
+binaryRecords SparkContext functions. Both will read a directory filled
+with binary files. The first will create one record per file, while the
+second will partition files into records of an explicitly stated number
+of bytes. For example, the following line will create an RDD with
+partitions containing records of size float{[}3{]}:
+
+vecs = sc.binaryRecords(sys.argv{[}1{]}, 12)
+
+The binary data is read into a string. If you want to use the data as a
+numpy array, the numpy.fromstring function can be used:
+
+arr= np.fromstring(vec, dtype=np.float32)
+
+This function can be used by RDD.map in order to convert the string
+records into numpy records:
+
+data = vecs.map(parseVector)
+
+\subsubsection{Streaming}\label{streaming-1}
+
+How to run spark in streaming mode.
+
+\subsubsection{Spark and Tachyon}\label{spark-and-tachyon}
+
+How do they work together? Are the performance characteristics
+different?
+
+Is it the same as ceph on Magellan? (ask Dan Olsen about ceph)
+
+\subsubsection{Pegasus}\label{pegasus}
+
+todo
+
+\subsubsection{MPI}\label{mpi}
+
+todo: reference implementation
+
+\subsection{System Architectures}\label{system-architectures}
+
+\subsubsection{Cooley}\label{cooley}
+
+225Tflop cluster with 40Tb memory, shared disk + 355Tb local disk per
+node, ...
+
+\subsubsection{Magellan}\label{magellan}
+
+7000 node cloud, no shared disk, per-node provisioning flexibility,
+\ldots{}
+
+\subsection{Sample Applications}\label{sample-applications}
+
+\subsubsection{APS}\label{aps}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \begin{quote}
+  analyze image stacks from advanced photon source
+  \end{quote}
+\item
+  \begin{quote}
+  save results as IDX
+  \end{quote}
+\end{enumerate}
+
+Our first sample application comes from a materials scientist who
+utilizes the Advanced Photon Source (APS) to scan the construction of a
+polymer material that could be used for nanoscale circuit printing. We
+received an image stack from the APS as well as a sample Matlab script
+and reproduced the results using the Spark framework.
+
+Details can be found here.
+
+\subsubsection{Bioinformatics}\label{bioinformatics}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \begin{quote}
+  look for patterns in genome streams
+  \end{quote}
+\item
+  \begin{quote}
+  and stuff
+  \end{quote}
+\end{enumerate}
+
+\subsubsection{EVS}\label{evs}
+
+\begin{enumerate}
+\def\labelenumi{\arabic{enumi}.}
+\item
+  \begin{quote}
+  look for patterns in genome streams
+  \end{quote}
+\item
+  \begin{quote}
+  and stuff
+  \end{quote}
+\end{enumerate}
+
+\subsection{Application Benchmarks}\label{application-benchmarks}
+
+- data sizes
+
+- data rates
+
+- \# of stages
+
+- system scale
+
+- M:N coupling (in flatmaps/reducemaps, fan-in/fan-out degress)
+
+- hw
+
+- spilling?
+
+- magellan vs cooley (shared storage vs node-level storage)
+
+\subsection{Pipeline Benchmarks}\label{pipeline-benchmarks}
+
+\begin{itemize}
+	\item
+	\begin{quote}
+		map
+	\end{quote}
+	\item
+	\begin{quote}
+		flatmap
+	\end{quote}
+	\item
+	\begin{quote}
+		reduce
+	\end{quote}
+	\item
+	\begin{quote}
+		reducemap (ex: aggregation for file i/o)
+	\end{quote}
+	\item
+	\begin{quote}
+		other?
+	\end{quote}
+\end{itemize}

@@ -1,0 +1,37 @@
+\begin{abstract}
+
+As dataset sizes grow, data analysis tasks in High Performance Computing
+increasingly depend on sophisticated data-flows and out-of-core methods for
+efficient system utilization. In addition, as HPC systems get larger, memory
+access and data sharing are becoming performance bottlenecks. Cloud computing
+is a data processing paradigm typically built on a loosely connected group of
+low cost computing nodes without shared storage or memory. An emerging
+exemplar in cloud computing is Apache Spark. In a sense, larger HPC systems
+may start to look like very high performance clouds, and therefore we wish to
+consider the potential of utilizing cloud frameworks in the context of HPC
+data processing.
+
+Our work proceeds by identifying common parallel analysis data flows for both
+MPI-based and cloud-based applications, such as map and reduce. We construct
+and perform several microbenchmarks to determine the performance
+characteristic of these tasks using both types of system. In addition, we
+compare the results for two real-world analysis tasks. The results of our
+experiments are discussed in the context of their applicability to future HPC
+architectures. Beyond understanding performance, our work is a demonstration that
+technologies such as Apache Spark, while typically aimed at multi-tenant
+cloud-based environments, can be used effectively in a traditional
+clustering/supercomputing environment via the job scheduler. In the
+case of Apache Spark, we also consider whether language plays a role,
+especially when writing code in Python or Java/Scala.
+
+\end{abstract}
+
+% TODO: Get ACM categories right.
+% A category with the (minimum) three required fields
+\category{H.4}{Information Systems Applications}{Miscellaneous}
+%A category including the fourth, optional field follows...
+\category{D.2.8}{Software Engineering}{Metrics}[complexity measures, performance measures]
+
+\terms{Theory}
+
+\keywords{ACM proceedings, \LaTeX, text tagging}
