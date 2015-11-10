@@ -15,18 +15,25 @@ nodes=$3
 queue=$4
 
 #make sure spark-hostname file isn't still kicking around
-if [ -e ~/spark-hostname ]; then
-  rm ~/spark-hostname
+if [ -e $HOME/spark-hostname ]; then
+  rm $HOME/spark-hostname
 fi
 
 # submit
 qsub -n $nodes -t $time -A $allocation -q ${queue} /home/camc/bin/start-spark.sh
 
-while [ ! -e ~/spark-hostname ]; do 
-  echo "Waiting for Spark to launch..."; sleep 5
+count=0
+while [ ! -e $HOME/spark-hostname ]; do 
+  echo "Waiting for Spark to launch..."; sleep 3
+  count=$((count+1))
+  if [ $count -gt 200 ]
+  then
+    echo "Spark failed to launch within ten minutes."
+    break
+  fi
 done
 
-cat ~/spark-hostname
-rm ~/spark-hostname
+cat $HOME/spark-hostname
+rm $HOME/spark-hostname
 
 
